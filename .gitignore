@@ -1,0 +1,6 @@
+# Cargo and Rust
+target/
+
+# Edit and IDE
+.idea/
+.vscode/
