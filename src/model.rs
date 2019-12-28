@@ -3,13 +3,14 @@
 pub enum Site {
     GitHub,
     GitLab,
+    BitBucket,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Identity {
-    repo: String,
-    owner: String,
-    site: Site,
+    pub site: Site,
+    pub owner: String,
+    pub repo: String,
 }
 
 #[derive(Debug)]

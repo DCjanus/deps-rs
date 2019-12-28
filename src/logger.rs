@@ -17,6 +17,10 @@ pub fn init_logger() -> anyhow::Result<()> {
             ))
         })
         .level(LevelFilter::Info)
+        .level_for(
+            module_path!().splitn(2, "::").next().unwrap(),
+            LevelFilter::Debug,
+        )
         .chain(std::io::stdout())
         .apply()?;
     Ok(())

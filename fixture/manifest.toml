@@ -1,0 +1,27 @@
+[package]
+name = "simple"
+version = "0.1.0"
+authors = ["DCjanus <DCjanus@dcjanus.com>"]
+
+[dependencies]
+all = "*"
+direct1 = "0.1.0"
+direct2 = "=0.1.0"
+table1 = { version = "0.1.0", features = ["serde"] }
+table2 = { version = "0.1.0" }
+git = { git = "https://github.com/xxx/xxx", version = "0.1.0" }
+custom-registry = { version = "0.1.0", registry = "xxx" }
+path = { version = "0.1.0", path = "xxx" }
+
+[dependencies.table3]
+version = "0.1.0"
+
+[build-dependencies]
+build-dependency = "0.1.0"
+
+[workspace]
+members = [
+    "a",
+    "b",
+    "c"
+]
