@@ -4,3 +4,6 @@ target/
 # Edit and IDE
 .idea/
 .vscode/
+
+# cache
+deps.cache
