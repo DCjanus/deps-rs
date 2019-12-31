@@ -24,13 +24,13 @@ fn init_client() -> AnyResult<Client> {
     let mut builder = Client::builder();
     if let Some(proxy_url) = &crate::command::COMMAND.proxy {
         let proxy = Proxy::all(proxy_url.clone())?;
-        debug!("using proxy {:?}", proxy);
+        debug!("using proxy {}", proxy_url);
         builder = builder.proxy(proxy)
     }
     Ok(builder.build()?)
 }
 
-pub async fn _fetch(ident: &Identity, rel_path: &Path) -> AnyResult<Bytes> {
+pub async fn fetch(ident: &Identity, rel_path: &Path) -> AnyResult<Bytes> {
     let url = match ident.site {
         Site::GitHub => format!(
             "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{rel_path}",
@@ -51,5 +51,6 @@ pub async fn _fetch(ident: &Identity, rel_path: &Path) -> AnyResult<Bytes> {
             rel_path = rel_path.display()
         ),
     };
+    trace!("fetching {}", url);
     Ok(GLOBAL_CLIENT.get(&url).send().await?.bytes().await?)
 }

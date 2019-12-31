@@ -28,12 +28,12 @@ pub enum Dependency {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Default)]
 pub struct Workspace {
-    members: Vec<String>,
+    pub members: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 pub struct Package {
-    name: String,
+    pub name: String,
 }
 
 #[test]

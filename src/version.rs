@@ -28,23 +28,24 @@ pub fn init() -> AnyResult {
         Ok(())
     }
     lazy_static::initialize(&VERSION_DB);
+    tick()?;
 
     std::thread::spawn(|| loop {
-        if let Err(error) = tick() {
-            error!("failed to fresh version db: {}", error);
-        }
         let sleep_duration = crate::command::COMMAND.interval;
         debug!(
             "fresh version db after {}",
             humantime::format_duration(sleep_duration)
         );
         std::thread::sleep(sleep_duration);
+
+        if let Err(error) = tick() {
+            error!("failed to fresh version db: {}", error);
+        }
     });
 
     Ok(())
 }
 
-// TODO: delete this lint attribute
 #[allow(dead_code)]
 pub fn latest(crate_name: &str) -> Option<Version> {
     VERSION_DB.read().unwrap().get(crate_name).cloned()
@@ -117,7 +118,6 @@ fn sync_index() -> AnyResult {
 
     let mut proxy_option = ProxyOptions::new();
     if let Some(proxy_url) = &crate::command::COMMAND.proxy {
-        debug!("using proxy for git: {}", proxy_url);
         proxy_option.url(proxy_url.as_str());
     } else {
         proxy_option.auto();

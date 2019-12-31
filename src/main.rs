@@ -14,6 +14,7 @@ mod fetch;
 mod logger;
 mod model;
 mod parser;
+mod process;
 mod utils;
 mod version;
 mod view;
