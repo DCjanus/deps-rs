@@ -1,3 +1,5 @@
+use badge::BadgeOptions;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Site {
@@ -14,28 +16,42 @@ pub struct Identity {
 }
 
 #[derive(Debug)]
-pub struct Status {
-    pub total: u32,
-    pub outdated: u32,
+pub enum Status {
+    Unknown,
+    Known { total: u32, outdated: u32 },
 }
 
 impl Status {
     pub fn to_svg(&self) -> String {
-        let (color, status) = if self.outdated > 0 {
-            (
-                "#dfb317".to_string(),
-                format!("{} of {} outdated", self.outdated, self.total),
-            )
-        } else {
-            ("#4c1".to_string(), "up to date".to_string())
+        let badge_options = match self {
+            Status::Unknown => BadgeOptions {
+                subject: "dependencies".into(),
+                status: "unknown".into(),
+                color: "#9f9f9f".into(),
+            },
+            Status::Known { total, outdated } => {
+                if *outdated > 0 {
+                    BadgeOptions {
+                        subject: "dependencies".into(),
+                        status: format!("{} of {} outdated", outdated, total),
+                        color: "#dfb317".into(),
+                    }
+                } else if *total > 0 {
+                    BadgeOptions {
+                        subject: "dependencies".into(),
+                        status: "up to date".into(),
+                        color: "#4c1".into(),
+                    }
+                } else {
+                    BadgeOptions {
+                        subject: "dependencies".into(),
+                        status: "none".into(),
+                        color: "#4c1".into(),
+                    }
+                }
+            }
         };
 
-        badge::Badge::new(badge::BadgeOptions {
-            subject: "dependencies".to_string(),
-            status,
-            color,
-        })
-        .unwrap()
-        .to_svg()
+        badge::Badge::new(badge_options).unwrap().to_svg()
     }
 }

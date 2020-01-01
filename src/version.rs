@@ -46,7 +46,6 @@ pub fn init() -> AnyResult {
     Ok(())
 }
 
-#[allow(dead_code)]
 pub fn latest(crate_name: &str) -> Option<Version> {
     VERSION_DB.read().unwrap().get(crate_name).cloned()
 }

@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO: remove this once whole project is done.
+
 #[macro_use]
 extern crate actix_web;
 #[macro_use]

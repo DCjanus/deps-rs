@@ -48,7 +48,6 @@ fn process_dependencies(input: IndexMap<String, crate::parser::Dependency>) -> V
     result
 }
 
-#[allow(dead_code)]
 pub async fn process(
     identity: &Identity,
     rel_path: impl Into<PathBuf>,
