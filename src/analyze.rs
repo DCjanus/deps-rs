@@ -48,14 +48,11 @@ fn process_dependencies(input: IndexMap<String, crate::parser::Dependency>) -> V
     result
 }
 
-pub async fn process(
-    identity: &Identity,
-    rel_path: impl Into<PathBuf>,
-) -> AnyResult<Vec<CrateMeta>> {
+pub async fn analyze(identity: &Identity) -> AnyResult<Vec<CrateMeta>> {
     let mut result = vec![];
     let mut rel_paths = VecDeque::new();
 
-    rel_paths.push_back(rel_path.into());
+    rel_paths.push_back(PathBuf::from(""));
     while let Some(rel_path) = rel_paths.pop_front() {
         let content = crate::fetch::fetch(identity, &rel_path.join("Cargo.toml")).await?;
         let manifest: Manifest = toml::from_slice(content.as_ref())?;

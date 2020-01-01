@@ -11,12 +11,12 @@ extern crate serde;
 
 use crate::utils::AnyResult;
 
+mod analyze;
 mod command;
 mod fetch;
 mod logger;
 mod model;
 mod parser;
-mod process;
 mod utils;
 mod version;
 mod view;
