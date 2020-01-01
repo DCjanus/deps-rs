@@ -1,6 +1,9 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Mutex, MutexGuard, RwLock},
+};
 
-use git2::{FetchOptions, FetchPrune, ProxyOptions, Repository, TreeWalkMode};
+use git2::{FetchOptions, FetchPrune, ObjectType, Oid, ProxyOptions, Repository, TreeWalkMode};
 use semver::Version;
 
 use crate::utils::AnyResult;
@@ -21,7 +24,6 @@ pub fn init() -> AnyResult {
 
         let begin = std::time::Instant::now();
         let mut db = VERSION_DB.write().unwrap();
-        db.clear();
         db.extend(new_db);
         debug!("fresh version db took {:?}", begin.elapsed());
 
@@ -51,6 +53,10 @@ pub fn latest(crate_name: &str) -> Option<Version> {
 }
 
 fn load_index() -> AnyResult<HashMap<String, Version>> {
+    lazy_static! {
+        static ref LAST_TREE: Mutex<Oid> = Mutex::new(Oid::zero());
+    }
+
     #[derive(Debug, Deserialize)]
     struct VersionMeta {
         name: String,
@@ -60,14 +66,32 @@ fn load_index() -> AnyResult<HashMap<String, Version>> {
 
     let index_dir = crate::command::COMMAND.cache.join("crates.io-index");
     let repo = Repository::open_bare(&index_dir)?;
-    let tree = repo
+    let new_tree = repo
         .find_reference("refs/remotes/upstream/master")?
         .peel_to_tree()?;
 
+    let mut old_tree_id: MutexGuard<Oid> = LAST_TREE.lock().unwrap();
+    if new_tree.id() == *old_tree_id {
+        trace!("skip whole crates index");
+        return Ok(Default::default());
+    }
+
+    let mut old_ids = HashSet::new();
+    if let Ok(old_tree) = repo.find_tree(*old_tree_id) {
+        old_tree.walk(TreeWalkMode::PostOrder, |_, entry| {
+            old_ids.insert(entry.id());
+            0
+        })?;
+    }
+
     // XXX: only scan changed files
     let mut versions = HashMap::new();
-    tree.walk(TreeWalkMode::PreOrder, |pwd, entry| {
-        if pwd.bytes().filter(|x| *x == b'/').count() != 2 && pwd != "1/" && pwd != "2/" {
+    new_tree.walk(TreeWalkMode::PreOrder, |pwd, entry| {
+        if old_ids.contains(&entry.id()) {
+            debug!("skip {}/{}", pwd, entry.name().unwrap());
+            return 1;
+        }
+        if entry.kind() != Some(ObjectType::Blob) {
             return 0;
         }
 
@@ -99,6 +123,8 @@ fn load_index() -> AnyResult<HashMap<String, Version>> {
 
         0
     })?;
+
+    *old_tree_id = new_tree.id();
     Ok(versions)
 }
 
