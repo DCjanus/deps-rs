@@ -1,6 +1,7 @@
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet, path::Path, sync::RwLock};
 
 use git2::{FetchOptions, FetchPrune, ObjectType, Oid, ProxyOptions, Repository, TreeWalkMode};
+use rustsec::Database;
 use semver::{Version, VersionReq};
 use sled::Tree;
 
@@ -9,6 +10,7 @@ use crate::utils::AnyResult;
 lazy_static! {
     static ref CRATE_DB: CrateDB =
         CrateDB::new(&crate::command::COMMAND.cache.join("crate_db")).unwrap();
+    static ref AUDIT_DB: RwLock<Database> = RwLock::new(Database::fetch().unwrap());
 }
 
 pub fn init() -> AnyResult {
@@ -21,8 +23,16 @@ pub fn init() -> AnyResult {
         CRATE_DB.fresh()?;
         debug!("fresh index used {:?}", begin.elapsed());
 
+        let begin = std::time::Instant::now();
+        let new_db = rustsec::Database::fetch()?;
+        *AUDIT_DB.write().unwrap() = new_db;
+        debug!("fresh audit database used: {:?}", begin.elapsed());
+
         Ok(())
     }
+
+    lazy_static::initialize(&AUDIT_DB);
+    lazy_static::initialize(&CRATE_DB);
     tick()?;
 
     std::thread::spawn(|| loop {
@@ -43,6 +53,12 @@ pub fn init() -> AnyResult {
 
 pub fn get_crate_metas(crate_name: &str) -> AnyResult<Option<Vec<CrateMeta>>> {
     CRATE_DB.get_crate_metas(crate_name)
+}
+
+pub fn is_insecure(name: &str, version: Version) -> AnyResult<bool> {
+    let package: rustsec::package::Name = name.parse()?;
+    let query = rustsec::database::Query::new().package_version(package, version);
+    Ok(!AUDIT_DB.read().unwrap().query(&query).is_empty())
 }
 
 #[derive(Debug, Deserialize, Serialize)]

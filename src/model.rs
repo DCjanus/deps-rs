@@ -18,7 +18,8 @@ pub struct Identity {
 #[derive(Debug)]
 pub enum Status {
     Unknown,
-    Known { total: u32, outdated: u32 },
+    Insecure,
+    Normal { total: u32, outdated: u32 },
 }
 
 impl Status {
@@ -29,7 +30,7 @@ impl Status {
                 status: "unknown".into(),
                 color: "#9f9f9f".into(),
             },
-            Status::Known { total, outdated } => {
+            Status::Normal { total, outdated } => {
                 if *outdated > 0 {
                     BadgeOptions {
                         subject: "dependencies".into(),
@@ -50,6 +51,11 @@ impl Status {
                     }
                 }
             }
+            Status::Insecure => BadgeOptions {
+                subject: "dependencies".into(),
+                status: "insecure".into(),
+                color: "#e05d44".into(),
+            },
         };
 
         badge::Badge::new(badge_options).unwrap().to_svg()

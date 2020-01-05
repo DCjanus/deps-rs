@@ -15,12 +15,12 @@ use crate::utils::AnyResult;
 
 mod analyze;
 mod command;
+mod database;
 mod fetch;
 mod logger;
 mod model;
 mod parser;
 mod utils;
-mod version;
 mod view;
 
 #[actix_rt::main]
@@ -43,7 +43,7 @@ fn init() -> AnyResult {
     crate::logger::init_logger()?;
     lazy_static::initialize(&crate::command::COMMAND);
     lazy_static::initialize(&crate::fetch::GLOBAL_CLIENT);
-    crate::version::init()?;
+    crate::database::init()?;
 
     Ok(())
 }

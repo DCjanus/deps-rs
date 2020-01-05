@@ -19,6 +19,13 @@ pub struct AnalyzedCrate {
 
 impl AnalyzedCrate {
     pub fn status(&self) -> Status {
+        if self.dependencies.iter().any(|x| x.is_insecure())
+            || self.dev_dependencies.iter().any(|x| x.is_insecure())
+            || self.build_dependencies.iter().any(|x| x.is_insecure())
+        {
+            return Status::Insecure;
+        }
+
         let total =
             self.dependencies.len() + self.dev_dependencies.len() + self.build_dependencies.len();
         let total = total as u32;
@@ -34,7 +41,7 @@ impl AnalyzedCrate {
                 .filter(|x| x.is_outdated())
                 .count();
         let outdated = outdated as u32;
-        Status::Known { total, outdated }
+        Status::Normal { total, outdated }
     }
 }
 
@@ -50,6 +57,21 @@ impl AnalyzedDependency {
     pub fn is_outdated(&self) -> bool {
         self.latest > self.latest_that_matches
     }
+
+    pub fn is_insecure(&self) -> bool {
+        if self.latest_that_matches.is_none() {
+            return false;
+        }
+
+        let version = self.latest_that_matches.as_ref().unwrap().clone();
+        match crate::database::is_insecure(&self.name, version) {
+            Ok(x) => x,
+            Err(error) => {
+                error!("failed to query audit database: {:?}", error);
+                false
+            }
+        }
+    }
 }
 
 fn analyze_dependencies(
@@ -63,7 +85,7 @@ fn analyze_dependencies(
             Dependency::Table { version } => version,
             _ => continue,
         };
-        let crates = match crate::version::get_crate_metas(&name) {
+        let crates = match crate::database::get_crate_metas(&name) {
             Ok(Some(x)) => x,
             Err(error) => {
                 error!("failed to get crate metadata: {:?}", error);
