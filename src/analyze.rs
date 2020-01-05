@@ -4,43 +4,93 @@ use indexmap::map::IndexMap;
 use semver::{Version, VersionReq};
 
 use crate::{
-    model::Identity,
+    model::{Identity, Status},
     parser::{Dependency, Manifest},
     utils::AnyResult,
 };
 
 #[derive(Debug, Deserialize)]
-pub struct CrateMeta {
-    name: String,
-    dependencies: Vec<DependencyMeta>,
-    dev_dependencies: Vec<DependencyMeta>,
-    build_dependencies: Vec<DependencyMeta>,
+pub struct AnalyzedCrate {
+    pub name: String,
+    pub dependencies: Vec<AnalyzedDependency>,
+    pub dev_dependencies: Vec<AnalyzedDependency>,
+    pub build_dependencies: Vec<AnalyzedDependency>,
+}
+
+impl AnalyzedCrate {
+    pub fn status(&self) -> Status {
+        let total =
+            self.dependencies.len() + self.dev_dependencies.len() + self.build_dependencies.len();
+        let total = total as u32;
+        let outdated = self.dependencies.iter().filter(|x| x.is_outdated()).count()
+            + self
+                .dev_dependencies
+                .iter()
+                .filter(|x| x.is_outdated())
+                .count()
+            + self
+                .build_dependencies
+                .iter()
+                .filter(|x| x.is_outdated())
+                .count();
+        let outdated = outdated as u32;
+        Status::Known { total, outdated }
+    }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DependencyMeta {
-    name: String,
-    version_require: VersionReq,
-    latest: Version,
+pub struct AnalyzedDependency {
+    pub name: String,
+    pub required: VersionReq,
+    pub latest_that_matches: Option<Version>,
+    pub latest: Option<Version>,
 }
 
-fn process_dependencies(input: IndexMap<String, crate::parser::Dependency>) -> Vec<DependencyMeta> {
+impl AnalyzedDependency {
+    pub fn is_outdated(&self) -> bool {
+        self.latest > self.latest_that_matches
+    }
+}
+
+fn analyze_dependencies(
+    input: IndexMap<String, crate::parser::Dependency>,
+) -> Vec<AnalyzedDependency> {
     let mut result = vec![];
 
     for (name, dep) in input.into_iter() {
-        let version_require = match dep {
+        let required = match dep {
             Dependency::Direct(version) => version,
             Dependency::Table { version } => version,
             _ => continue,
         };
-        let latest = match crate::version::latest(&name) {
-            None => continue,
-            Some(x) => x,
+        let crates = match crate::version::get_crate_metas(&name) {
+            Ok(Some(x)) => x,
+            Err(error) => {
+                error!("failed to get crate metadata: {:?}", error);
+                continue;
+            }
+            Ok(None) => {
+                debug!("no such crate found: {}", name);
+                continue;
+            }
         };
 
-        result.push(DependencyMeta {
+        let latest = crates
+            .iter()
+            .filter(|x| !x.yanked && !x.vers.is_prerelease())
+            .map(|x| x.vers.clone())
+            .max();
+
+        let latest_that_matches = crates
+            .iter()
+            .map(|x| x.vers.clone())
+            .filter(|x| required.matches(x))
+            .max();
+
+        result.push(AnalyzedDependency {
             name,
-            version_require,
+            required,
+            latest_that_matches,
             latest,
         });
     }
@@ -48,7 +98,7 @@ fn process_dependencies(input: IndexMap<String, crate::parser::Dependency>) -> V
     result
 }
 
-pub async fn analyze(identity: &Identity) -> AnyResult<Vec<CrateMeta>> {
+pub async fn analyze(identity: &Identity) -> AnyResult<Vec<AnalyzedCrate>> {
     let mut result = vec![];
     let mut rel_paths = VecDeque::new();
 
@@ -58,11 +108,11 @@ pub async fn analyze(identity: &Identity) -> AnyResult<Vec<CrateMeta>> {
         let manifest: Manifest = toml::from_slice(content.as_ref())?;
 
         if let Some(package) = manifest.package {
-            result.push(CrateMeta {
+            result.push(AnalyzedCrate {
                 name: package.name,
-                dependencies: process_dependencies(manifest.dependencies),
-                dev_dependencies: process_dependencies(manifest.dev_dependencies),
-                build_dependencies: process_dependencies(manifest.build_dependencies),
+                dependencies: analyze_dependencies(manifest.dependencies),
+                dev_dependencies: analyze_dependencies(manifest.dev_dependencies),
+                build_dependencies: analyze_dependencies(manifest.build_dependencies),
             });
         }
         for i in manifest.workspace.members {
