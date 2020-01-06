@@ -1,7 +1,7 @@
 use std::{collections::HashSet, path::Path, sync::RwLock};
 
 use git2::{FetchOptions, FetchPrune, ObjectType, Oid, ProxyOptions, Repository, TreeWalkMode};
-use rustsec::Database;
+use rustsec::{Collection, Database};
 use semver::{Version, VersionReq};
 use sled::Tree;
 
@@ -57,8 +57,12 @@ pub fn get_crate_metas(crate_name: &str) -> AnyResult<Option<Vec<CrateMeta>>> {
 
 pub fn is_insecure(name: &str, version: Version) -> AnyResult<bool> {
     let package: rustsec::package::Name = name.parse()?;
-    let query = rustsec::database::Query::new().package_version(package, version);
-    Ok(!AUDIT_DB.read().unwrap().query(&query).is_empty())
+    let query = rustsec::database::Query::new()
+        .collection(Collection::Crates)
+        .package_version(package, version);
+
+    let safe = AUDIT_DB.read().unwrap().query(&query).is_empty();
+    Ok(!safe)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -69,20 +73,21 @@ pub struct CrateMeta {
     pub deps: Vec<DependencyMeta>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DependencyMeta {
     pub name: String,
     pub req: VersionReq,
+    pub kind: Option<DependencyKind>,
     pub features: Vec<String>,
     pub optional: bool,
     pub default_features: bool,
     pub target: Option<String>,
-    pub kind: DependencyKind,
     pub registry: Option<String>,
     pub package: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum DependencyKind {
     Normal,
     Build,
@@ -199,7 +204,7 @@ impl CrateDB {
                 return 0;
             }
             if old_ids.contains(&entry.id()) {
-                debug!("skip {}/{}", pwd, entry.name().unwrap());
+                trace!("skip {}/{}", pwd, entry.name().unwrap());
                 return 1;
             }
             let blob = match repo.find_blob(entry.id()) {

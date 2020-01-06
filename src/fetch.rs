@@ -4,7 +4,7 @@ use bytes::Bytes;
 use reqwest::{Client, Proxy};
 
 use crate::{
-    model::{Identity, Site},
+    model::{RepoIdentity, Site},
     utils::AnyResult,
 };
 
@@ -30,7 +30,7 @@ fn init_client() -> AnyResult<Client> {
     Ok(builder.build()?)
 }
 
-pub async fn fetch(ident: &Identity, rel_path: &Path) -> AnyResult<Bytes> {
+pub async fn fetch(ident: &RepoIdentity, rel_path: &Path) -> AnyResult<Bytes> {
     let url = match ident.site {
         Site::GitHub => format!(
             "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{rel_path}",

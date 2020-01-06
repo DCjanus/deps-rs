@@ -4,7 +4,8 @@ use indexmap::map::IndexMap;
 use semver::{Version, VersionReq};
 
 use crate::{
-    model::{Identity, Status},
+    database::{CrateMeta, DependencyKind},
+    model::{RepoIdentity, Status},
     parser::{Dependency, Manifest},
     utils::AnyResult,
 };
@@ -120,7 +121,42 @@ fn analyze_dependencies(
     result
 }
 
-pub async fn analyze(identity: &Identity) -> AnyResult<Vec<AnalyzedCrate>> {
+pub fn analyze_crate(crate_name: &str, version: Version) -> Option<AnalyzedCrate> {
+    let meta: CrateMeta = crate::database::get_crate_metas(crate_name)
+        .ok()??
+        .into_iter()
+        .find(|x| x.vers == version)?;
+    let dependencies = meta
+        .deps
+        .iter()
+        .filter(|x| x.kind == Some(DependencyKind::Normal) || x.kind == None)
+        .cloned()
+        .map(|x| (x.name, crate::parser::Dependency::Direct(x.req)))
+        .collect();
+    let dev_dependencies = meta
+        .deps
+        .iter()
+        .filter(|x| x.kind == Some(DependencyKind::Dev))
+        .cloned()
+        .map(|x| (x.name, crate::parser::Dependency::Direct(x.req)))
+        .collect();
+    let build_dependencies = meta
+        .deps
+        .iter()
+        .filter(|x| x.kind == Some(DependencyKind::Build))
+        .cloned()
+        .map(|x| (x.name, crate::parser::Dependency::Direct(x.req)))
+        .collect();
+    let result = AnalyzedCrate {
+        name: crate_name.to_string(),
+        dependencies: analyze_dependencies(dependencies),
+        dev_dependencies: analyze_dependencies(dev_dependencies),
+        build_dependencies: analyze_dependencies(build_dependencies),
+    };
+    Some(result)
+}
+
+pub async fn analyze_repo(identity: &RepoIdentity) -> AnyResult<Vec<AnalyzedCrate>> {
     let mut result = vec![];
     let mut rel_paths = VecDeque::new();
 
