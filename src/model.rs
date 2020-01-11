@@ -1,8 +1,6 @@
 use std::{iter::Sum, ops::Add};
 
-use actix_web::{HttpRequest, HttpResponse, Responder};
 use badge::BadgeOptions;
-use futures::future::Ready;
 use semver::Version;
 
 #[derive(Debug, Deserialize)]
@@ -69,19 +67,6 @@ impl Add for Status {
                 outdated: outdated1 + outdated2,
             },
         }
-    }
-}
-
-impl Responder for Status {
-    type Error = ();
-    type Future = Ready<Result<HttpResponse, ()>>;
-
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        let response = HttpResponse::Ok()
-            .content_type("image/svg+xml;charset=utf-8")
-            .body(self.to_svg());
-
-        futures::future::ready(Ok(response))
     }
 }
 
