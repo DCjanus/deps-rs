@@ -15,6 +15,7 @@ lazy_static! {
 
 pub fn init() -> AnyResult {
     fn tick() -> AnyResult {
+        debug!("fetching index ....");
         let begin = std::time::Instant::now();
         CRATE_DB.fetch()?;
         debug!("fetch index used {:?}", begin.elapsed());
@@ -31,7 +32,10 @@ pub fn init() -> AnyResult {
         Ok(())
     }
 
+    debug!("fetching audit database");
+    // TODO: fetching audit database via proxy
     lazy_static::initialize(&AUDIT_DB);
+    debug!("creating crate database");
     lazy_static::initialize(&CRATE_DB);
     tick()?;
 
