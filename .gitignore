@@ -7,3 +7,6 @@ target/
 
 # cache
 deps.cache
+
+# static
+static/style.css
