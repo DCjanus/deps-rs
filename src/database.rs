@@ -8,8 +8,7 @@ use sled::Tree;
 use crate::utils::AnyResult;
 
 lazy_static! {
-    static ref CRATE_DB: CrateDB =
-        CrateDB::new(&crate::command::COMMAND.cache.join("crate_db")).unwrap();
+    static ref CRATE_DB: CrateDB = CrateDB::new(&crate::command::crate_db_path()).unwrap();
     static ref AUDIT_DB: RwLock<Database> = RwLock::new(Database::fetch().unwrap());
 }
 
@@ -40,7 +39,7 @@ pub fn init() -> AnyResult {
     tick()?;
 
     std::thread::spawn(|| loop {
-        let sleep_duration = crate::command::COMMAND.interval;
+        let sleep_duration = crate::command::tick_interval();
         debug!(
             "fresh version db after {}",
             humantime::format_duration(sleep_duration)
@@ -113,7 +112,7 @@ impl CrateDB {
     }
 
     fn fetch(&self) -> AnyResult {
-        let index_dir = crate::command::COMMAND.cache.join("crates.io-index");
+        let index_dir = crate::command::cache_dir();
         if !index_dir.exists() {
             std::fs::create_dir_all(&index_dir)?;
             debug!("created index directory {}", index_dir.display());
@@ -121,14 +120,14 @@ impl CrateDB {
 
         let repo = Repository::init_bare(&index_dir)?;
         if repo.find_remote("upstream").is_err() {
-            repo.remote("upstream", crate::command::COMMAND.index.as_str())?;
-            debug!("created remote: {}", crate::command::COMMAND.index);
+            repo.remote("upstream", crate::command::index_url())?;
+            debug!("created remote: {}", crate::command::index_url());
         }
-        repo.remote_set_url("upstream", crate::command::COMMAND.index.as_str())?;
+        repo.remote_set_url("upstream", crate::command::index_url())?;
 
         let mut proxy_option = ProxyOptions::new();
-        if let Some(proxy_url) = &crate::command::COMMAND.proxy {
-            proxy_option.url(proxy_url.as_str());
+        if let Some(proxy_url) = &crate::command::proxy() {
+            proxy_option.url(proxy_url);
         } else {
             proxy_option.auto();
         }
@@ -182,7 +181,7 @@ impl CrateDB {
     }
 
     fn fresh(&self) -> AnyResult {
-        let index_dir = crate::command::COMMAND.cache.join("crates.io-index");
+        let index_dir = crate::command::cache_dir();
         let repo = Repository::open_bare(&index_dir)?;
         let new_tree = repo
             .find_reference("refs/remotes/upstream/master")?

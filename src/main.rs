@@ -43,8 +43,8 @@ async fn main() -> AnyResult {
 
 fn init() -> AnyResult {
     crate::logger::init_logger()?;
-    lazy_static::initialize(&crate::command::COMMAND);
-    lazy_static::initialize(&crate::fetch::GLOBAL_CLIENT);
+    crate::command::init()?;
+    crate::fetch::init()?;
     crate::database::init()?;
 
     Ok(())

@@ -9,7 +9,7 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref GLOBAL_CLIENT: Client = {
+    static ref GLOBAL_CLIENT: Client = {
         match init_client() {
             Ok(x) => x,
             Err(e) => {
@@ -20,10 +20,15 @@ lazy_static! {
     };
 }
 
+pub fn init() -> AnyResult {
+    lazy_static::initialize(&GLOBAL_CLIENT);
+    Ok(())
+}
+
 fn init_client() -> AnyResult<Client> {
     let mut builder = Client::builder();
-    if let Some(proxy_url) = &crate::command::COMMAND.proxy {
-        let proxy = Proxy::all(proxy_url.clone())?;
+    if let Some(proxy_url) = &crate::command::proxy() {
+        let proxy = Proxy::all(*proxy_url)?;
         debug!("using proxy {}", proxy_url);
         builder = builder.proxy(proxy)
     }
