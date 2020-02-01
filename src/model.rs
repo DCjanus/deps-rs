@@ -1,6 +1,6 @@
 use std::{iter::Sum, ops::Add};
 
-use badge::BadgeOptions;
+use badge::{Badge, BadgeOptions};
 use semver::Version;
 
 #[derive(Debug, Deserialize)]
@@ -9,6 +9,32 @@ pub enum Site {
     GitHub,
     GitLab,
     BitBucket,
+}
+
+impl Site {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Site::GitHub => "github",
+            Site::GitLab => "gitlab",
+            Site::BitBucket => "bitbucket",
+        }
+    }
+
+    pub fn site_icon(&self) -> &'static str {
+        match self {
+            Site::GitHub => "fa-github",
+            Site::GitLab => "fa-gitlab",
+            Site::BitBucket => "fa-bitbucket",
+        }
+    }
+
+    pub fn base_uri(&self) -> &'static str {
+        match self {
+            Site::GitHub => "https://github.com",
+            Site::GitLab => "https://gitlab.com",
+            Site::BitBucket => "https://bitbucket.org",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,7 +97,7 @@ impl Add for Status {
 }
 
 impl Status {
-    pub fn to_svg(&self) -> String {
+    pub fn to_badge(&self) -> Badge {
         let badge_options = match self {
             Status::Unknown => BadgeOptions {
                 subject: "dependencies".into(),
@@ -106,6 +132,6 @@ impl Status {
             },
         };
 
-        badge::Badge::new(badge_options).unwrap().to_svg()
+        badge::Badge::new(badge_options).unwrap()
     }
 }

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% endblock title %} - Deps.rs</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Fira+Sans:400,500,600">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Code+Pro">
+    <link rel="stylesheet" type="text/css"
+        href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        /*ref: https://github.com/jgthms/bulma/pull/2788*/
+        .hero a:not(.button):not(.dropdown-item):not(.tag):not(.pagination-link):not(.is-current) {
+            color: inherit;
+        }
+    </style>
+</head>
+
+<body>
+    {% let self_base_url = "https://deps.rs" %}
+    {% block body %} {% endblock body %}
+</body>
+
+</html>

@@ -1,0 +1,24 @@
+<h2 class="title is-3">
+    Crate <code> {{name}} </code>
+</h2>
+
+{% if dependencies.deps.is_empty() && build_dependencies.deps.is_empty() && dev_dependencies.deps.is_empty() %}
+<p class="notification has-text-centered">
+    "No external dependencies! 🙌"
+</p>
+{% endif %}
+
+{% if !dependencies.deps.is_empty() %}
+<h3 class="title is-4">Dependencies</h3>
+{{ dependencies.render().unwrap() }}
+{% endif %}
+
+{% if !build_dependencies.deps.is_empty() %}
+<h3 class="title is-4">Dev dependencies</h3>
+{{ build_dependencies.render().unwrap() }}
+{% endif %}
+
+{% if !dev_dependencies.deps.is_empty() %}
+<h3 class="title is-4">Build dependencies</h3>
+{{ dev_dependencies.render().unwrap() }}
+{% endif %}

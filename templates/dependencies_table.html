@@ -1,0 +1,44 @@
+<p class="subtitle is-5">(
+    {% if count_insecure > 0 %}
+    {{ count_total }} total, {{ count_insecure }} insecure
+    {% else if count_outdated > 0 %}
+    {{ count_total }} total, {{ count_total - count_outdated }} up-to-date, {{ count_outdated }} outdated
+    {%else %}
+    {{ count_total }} total, all up-to-date
+    {% endif %}
+</p>
+
+<table class="table is-fullwidth is-striped is-hoverable">
+    <thead>
+        <tr>
+            <th>Crate</th>
+            <th class="has-text-right">Required</th>
+            <th class="has-text-right">Latest</th>
+            <th class="has-text-right">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for dep in deps %}
+        <tr>
+            <td>
+                <a href="https://crates.io/crates/{{ dep.name }}">{{ dep.name }}</a>
+            </td>
+            <td class="has-text-right">
+                <code>dep.required</code>
+            </td>
+            <td class="has-text-right">
+                <code>dep.latest</code>
+            </td>
+            <td class="has-text-right">
+                {% if dep.insecure %}
+                <span class="tag is-danger">insecure</span>
+                {% else if dep.outdated %}
+                <span class="tag is-warning">out of date</span>
+                {% else %}
+                <span class="tag is-success">up to date</span>
+                {%endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

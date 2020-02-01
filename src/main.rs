@@ -33,6 +33,7 @@ async fn main() -> AnyResult {
             .wrap(actix_web::middleware::Logger::default())
             .service(actix_files::Files::new("/static", "./static"))
             .service(crate::view::status::repo_svg)
+            .service(crate::view::status::repo_html)
             .service(crate::view::status::crate_svg)
     })
     .bind("127.0.0.1:8000")?
@@ -46,6 +47,7 @@ fn init() -> AnyResult {
     crate::logger::init_logger()?;
     crate::command::init()?;
     crate::fetch::init()?;
+    crate::view::init()?;
     crate::database::init()?;
 
     Ok(())

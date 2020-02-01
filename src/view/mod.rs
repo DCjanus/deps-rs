@@ -1,6 +1,8 @@
 use crate::utils::AnyResult;
 use sass_rs::{compile_file, Options, OutputStyle};
 
+pub mod data;
+pub mod html;
 pub mod status;
 
 pub fn init() -> AnyResult {
