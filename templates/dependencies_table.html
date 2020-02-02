@@ -24,10 +24,10 @@
                 <a href="https://crates.io/crates/{{ dep.name }}">{{ dep.name }}</a>
             </td>
             <td class="has-text-right">
-                <code>dep.required</code>
+                <code>{{ dep.required }}</code>
             </td>
             <td class="has-text-right">
-                <code>dep.latest</code>
+                <code>{{ dep.latest }}</code>
             </td>
             <td class="has-text-right">
                 {% if dep.insecure %}

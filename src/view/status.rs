@@ -87,3 +87,68 @@ pub async fn crate_svg(input: actix_web::web::Path<CrateIdentity>) -> impl Respo
         .content_type("image/svg+xml;charset=utf-8")
         .body(status.to_badge().to_svg())
 }
+
+#[derive(Debug, Template)]
+#[template(path = "crate_status.html", escape = "none")]
+struct CrateHtmlTemplate<'a> {
+    hero_class: &'static str,
+    ident: &'a CrateIdentity,
+    status: Status,
+    the_crate: CrateSectionTemplate,
+}
+
+#[get("/crate/{name}/{version}")]
+pub fn crate_html(input: actix_web::web::Path<CrateIdentity>) -> HttpResponse {
+    let analyze_result = match crate::analyze::analyze_crate(&input.name, input.version.clone()) {
+        Some(x) => x,
+        None => {
+            error!("failed to analyze crate: {} {}", input.name, input.version);
+            return server_error_response("failed to analyze given crate");
+        }
+    };
+
+    let status = analyze_result.status();
+    let hero_class = match status {
+        Status::Unknown => unreachable!(),
+        Status::Insecure => "is-danger",
+        Status::Normal { outdated, .. } => {
+            if outdated > 0 {
+                "is-warning"
+            } else {
+                "is-success"
+            }
+        }
+    };
+
+    let the_crate = CrateSectionTemplate {
+        name: analyze_result.name,
+        dependencies: DependenciesTableTemplate::new(
+            analyze_result
+                .dependencies
+                .into_iter()
+                .map(|d| d.into())
+                .collect(),
+        ),
+        build_dependencies: DependenciesTableTemplate::new(
+            analyze_result
+                .build_dependencies
+                .into_iter()
+                .map(|d| d.into())
+                .collect(),
+        ),
+        dev_dependencies: DependenciesTableTemplate::new(
+            analyze_result
+                .dev_dependencies
+                .into_iter()
+                .map(|d| d.into())
+                .collect(),
+        ),
+    };
+
+    render_template(CrateHtmlTemplate {
+        hero_class,
+        ident: &input,
+        status,
+        the_crate,
+    })
+}

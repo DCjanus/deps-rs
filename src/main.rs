@@ -35,6 +35,7 @@ async fn main() -> AnyResult {
             .service(crate::view::status::repo_svg)
             .service(crate::view::status::repo_html)
             .service(crate::view::status::crate_svg)
+            .service(crate::view::status::crate_html)
     })
     .bind("127.0.0.1:8000")?
     .run()
