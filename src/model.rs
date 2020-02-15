@@ -3,7 +3,7 @@ use std::{iter::Sum, ops::Add};
 use badge::{Badge, BadgeOptions};
 use semver::Version;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Site {
     GitHub,
@@ -37,7 +37,7 @@ impl Site {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
 pub struct RepoIdentity {
     pub site: Site,
     pub owner: String,

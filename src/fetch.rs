@@ -33,6 +33,8 @@ fn init_client() -> AnyResult<Client> {
 }
 
 pub async fn fetch(ident: &RepoIdentity, rel_path: &Path) -> AnyResult<Bytes> {
+    // TODO: cache on disk?
+
     let url = match ident.site {
         Site::GitHub => format!(
             "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{rel_path}",

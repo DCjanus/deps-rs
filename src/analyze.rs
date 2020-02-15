@@ -1,6 +1,13 @@
-use std::{collections::VecDeque, path::PathBuf};
+use std::{
+    collections::VecDeque,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
+use futures::lock::Mutex;
 use indexmap::map::IndexMap;
+use lru::LruCache;
+use once_cell::sync::Lazy;
 use semver::{Version, VersionReq};
 
 use crate::{
@@ -10,7 +17,7 @@ use crate::{
     utils::AnyResult,
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AnalyzedCrate {
     pub name: String,
     pub dependencies: Vec<AnalyzedDependency>,
@@ -46,7 +53,7 @@ impl AnalyzedCrate {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AnalyzedDependency {
     pub name: String,
     pub required: VersionReq,
@@ -157,6 +164,17 @@ pub fn analyze_crate(crate_name: &str, version: Version) -> Option<AnalyzedCrate
 }
 
 pub async fn analyze_repo(identity: &RepoIdentity) -> AnyResult<Vec<AnalyzedCrate>> {
+    static CACHE: Lazy<Mutex<LruCache<RepoIdentity, (Instant, Vec<AnalyzedCrate>)>>> =
+        Lazy::new(|| Mutex::new(LruCache::new(1024 * 128)));
+    {
+        if let Some((created_at, cache)) = CACHE.lock().await.get(identity).cloned() {
+            let created_at: Instant = created_at;
+            if created_at.elapsed() < Duration::from_secs(60 * 5) {
+                return Ok(cache);
+            }
+        }
+    }
+
     let mut result = vec![];
     let mut rel_paths = VecDeque::new();
 
@@ -177,6 +195,13 @@ pub async fn analyze_repo(identity: &RepoIdentity) -> AnyResult<Vec<AnalyzedCrat
             let rel_path = rel_path.join(i);
             rel_paths.push_back(rel_path);
         }
+    }
+
+    {
+        CACHE
+            .lock()
+            .await
+            .put(identity.clone(), (Instant::now(), result.clone()));
     }
 
     Ok(result)
