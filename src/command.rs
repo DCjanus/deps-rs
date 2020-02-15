@@ -1,12 +1,14 @@
 use std::{path::PathBuf, time::Duration};
 
 use once_cell::sync::Lazy;
+use sled::Db;
 use structopt::StructOpt;
 use url::Url;
 
 use crate::utils::AnyResult;
 
 static COMMAND: Lazy<Command> = Lazy::new(Command::from_args);
+static DATABASE: Lazy<Db> = Lazy::new(|| sled::open(&db_path()).unwrap());
 
 #[derive(Debug, StructOpt)]
 struct Command {
@@ -25,6 +27,8 @@ struct Command {
 
 pub fn init() -> AnyResult {
     Lazy::force(&COMMAND);
+    Lazy::force(&DATABASE);
+
     Ok(())
 }
 
@@ -32,8 +36,8 @@ pub fn proxy() -> Option<&'static str> {
     COMMAND.proxy.as_ref().map(|x| x.as_str())
 }
 
-pub fn crate_db_path() -> PathBuf {
-    COMMAND.cache.join("crate_db")
+pub fn db_path() -> PathBuf {
+    COMMAND.cache.join("database")
 }
 
 pub fn tick_interval() -> Duration {
@@ -46,4 +50,8 @@ pub fn cache_dir() -> PathBuf {
 
 pub fn index_url() -> &'static str {
     COMMAND.index.as_str()
+}
+
+pub fn database() -> &'static Db {
+    &DATABASE
 }

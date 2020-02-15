@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path, sync::RwLock};
+use std::{collections::HashSet, sync::RwLock};
 
 use git2::{FetchOptions, FetchPrune, ObjectType, Oid, ProxyOptions, Repository, TreeWalkMode};
 use once_cell::sync::Lazy;
@@ -8,19 +8,19 @@ use sled::Tree;
 
 use crate::utils::AnyResult;
 
-static CRATE_DB: Lazy<CrateDB> =
-    Lazy::new(|| CrateDB::new(&crate::command::crate_db_path()).unwrap());
+static INDEX_DB: Lazy<Tree> = Lazy::new(|| crate::command::database().open_tree("index").unwrap());
+static EXTRA_DB: Lazy<Tree> = Lazy::new(|| crate::command::database().open_tree("extra").unwrap());
 static AUDIT_DB: Lazy<RwLock<Database>> = Lazy::new(|| RwLock::new(Database::fetch().unwrap()));
 
 pub fn init() -> AnyResult {
     fn tick() -> AnyResult {
         debug!("fetching index ....");
         let begin = std::time::Instant::now();
-        CRATE_DB.fetch()?;
+        fetch_index()?;
         debug!("fetch index used {:?}", begin.elapsed());
 
         let begin = std::time::Instant::now();
-        CRATE_DB.fresh()?;
+        fresh_index_db()?;
         debug!("fresh index used {:?}", begin.elapsed());
 
         let begin = std::time::Instant::now();
@@ -35,7 +35,6 @@ pub fn init() -> AnyResult {
     // TODO: fetching audit database via proxy
     Lazy::force(&AUDIT_DB);
     debug!("creating crate database");
-    Lazy::force(&CRATE_DB);
     tick()?;
 
     std::thread::spawn(|| loop {
@@ -55,7 +54,15 @@ pub fn init() -> AnyResult {
 }
 
 pub fn get_crate_metas(crate_name: &str) -> AnyResult<Option<Vec<CrateMeta>>> {
-    CRATE_DB.get_crate_metas(crate_name)
+    let key = crate_name.as_bytes();
+    let content = match INDEX_DB.get(key)? {
+        None => {
+            return Ok(None);
+        }
+        Some(x) => x,
+    };
+    let result = bincode::deserialize(&*content)?;
+    Ok(Some(result))
 }
 
 pub fn is_insecure(name: &str, version: Version) -> AnyResult<bool> {
@@ -102,147 +109,118 @@ struct CrateDB {
     extra: Tree,
 }
 
-impl CrateDB {
-    fn new(path: &Path) -> AnyResult<Self> {
-        let db = sled::open(path)?;
-        let index = db.open_tree("index")?;
-        let extra = db.open_tree("extra")?;
-
-        Ok(Self { index, extra })
+fn fetch_index() -> AnyResult {
+    let index_dir = crate::command::cache_dir();
+    if !index_dir.exists() {
+        std::fs::create_dir_all(&index_dir)?;
+        debug!("created index directory {}", index_dir.display());
     }
 
-    fn fetch(&self) -> AnyResult {
-        let index_dir = crate::command::cache_dir();
-        if !index_dir.exists() {
-            std::fs::create_dir_all(&index_dir)?;
-            debug!("created index directory {}", index_dir.display());
-        }
+    let repo = Repository::init_bare(&index_dir)?;
+    if repo.find_remote("upstream").is_err() {
+        repo.remote("upstream", crate::command::index_url())?;
+        debug!("created remote: {}", crate::command::index_url());
+    }
+    repo.remote_set_url("upstream", crate::command::index_url())?;
 
-        let repo = Repository::init_bare(&index_dir)?;
-        if repo.find_remote("upstream").is_err() {
-            repo.remote("upstream", crate::command::index_url())?;
-            debug!("created remote: {}", crate::command::index_url());
-        }
-        repo.remote_set_url("upstream", crate::command::index_url())?;
-
-        let mut proxy_option = ProxyOptions::new();
-        if let Some(proxy_url) = &crate::command::proxy() {
-            proxy_option.url(proxy_url);
-        } else {
-            proxy_option.auto();
-        }
-
-        let mut fetch_option = FetchOptions::new();
-        fetch_option.prune(FetchPrune::On);
-        fetch_option.proxy_options(proxy_option);
-
-        repo.find_remote("upstream")?.fetch(
-            &["+refs/heads/master:refs/remotes/upstream/master"],
-            Some(&mut fetch_option),
-            None,
-        )?;
-
-        Ok(())
+    let mut proxy_option = ProxyOptions::new();
+    if let Some(proxy_url) = &crate::command::proxy() {
+        proxy_option.url(proxy_url);
+    } else {
+        proxy_option.auto();
     }
 
-    fn set_last_tree(&self, oid: Oid) -> AnyResult {
-        self.extra.insert("last_loaded_tree_id", oid.as_bytes())?;
-        Ok(())
-    }
+    let mut fetch_option = FetchOptions::new();
+    fetch_option.prune(FetchPrune::On);
+    fetch_option.proxy_options(proxy_option);
 
-    fn get_last_tree(&self) -> AnyResult<Option<Oid>> {
-        Ok(self
-            .extra
-            .get("last_loaded_tree_id")?
-            .map(|x| Oid::from_bytes(&*x).expect("broken 'last_loaded_tree_id'")))
-    }
+    repo.find_remote("upstream")?.fetch(
+        &["+refs/heads/master:refs/remotes/upstream/master"],
+        Some(&mut fetch_option),
+        None,
+    )?;
 
-    fn set_crate_metas(&self, metas: Vec<CrateMeta>) -> AnyResult {
+    Ok(())
+}
+
+fn fresh_index_db() -> AnyResult {
+    fn set_crate_metas(metas: Vec<CrateMeta>) -> AnyResult {
         if metas.is_empty() {
             bail!("given metas is empty");
         }
 
         let key = metas.first().unwrap().name.as_bytes();
         let value = bincode::serialize(&metas)?;
-        self.index.insert(key, value)?;
+        INDEX_DB.insert(key, value)?;
         Ok(())
     }
 
-    fn get_crate_metas(&self, crate_name: &str) -> AnyResult<Option<Vec<CrateMeta>>> {
-        let key = crate_name.as_bytes();
-        let content = match self.index.get(key)? {
-            None => {
-                return Ok(None);
+    const LAST_LOADED_TREE_ID: &str = "last_loaded_tree_id";
+
+    let index_dir = crate::command::cache_dir();
+    let repo = Repository::open_bare(&index_dir)?;
+    let new_tree = repo
+        .find_reference("refs/remotes/upstream/master")?
+        .peel_to_tree()?;
+
+    let old_tree_id = EXTRA_DB
+        .get(LAST_LOADED_TREE_ID)?
+        .map(|x| Oid::from_bytes(&*x).expect("broken 'last_loaded_tree_id'"));
+    if Some(new_tree.id()) == old_tree_id {
+        trace!("skip whole crates index");
+        return Ok(());
+    }
+
+    let mut old_ids = HashSet::new();
+    if let Some(old_tree_id) = old_tree_id {
+        repo.find_tree(old_tree_id)?
+            .walk(TreeWalkMode::PostOrder, |_, entry| {
+                old_ids.insert(entry.id());
+                0
+            })?;
+    }
+
+    new_tree.walk(TreeWalkMode::PostOrder, |pwd, entry| {
+        if pwd.is_empty() || entry.kind() != Some(ObjectType::Blob) {
+            return 0;
+        }
+        if old_ids.contains(&entry.id()) {
+            trace!("skip {}/{}", pwd, entry.name().unwrap());
+            return 1;
+        }
+        let blob = match repo.find_blob(entry.id()) {
+            Ok(x) => x,
+            Err(e) => {
+                error!(
+                    "failed to find blob: {}, pwd: {} entry: {:?} id: {}",
+                    e,
+                    pwd,
+                    entry.name(),
+                    entry.id()
+                );
+                return 0;
             }
-            Some(x) => x,
         };
-        let result = bincode::deserialize(&*content)?;
-        Ok(Some(result))
-    }
 
-    fn fresh(&self) -> AnyResult {
-        let index_dir = crate::command::cache_dir();
-        let repo = Repository::open_bare(&index_dir)?;
-        let new_tree = repo
-            .find_reference("refs/remotes/upstream/master")?
-            .peel_to_tree()?;
-
-        let old_tree_id = self.get_last_tree()?;
-        if Some(new_tree.id()) == old_tree_id {
-            trace!("skip whole crates index");
-            return Ok(());
+        let content = blob
+            .content()
+            .split(|x| *x == b'\n')
+            .map(|line| serde_json::from_slice::<CrateMeta>(line))
+            .filter_map(|x| x.ok())
+            .collect::<Vec<_>>();
+        if content.is_empty() {
+            error!("no valid crate meta found in {}/{:?}", pwd, entry.name());
+            return 0;
         }
 
-        let mut old_ids = HashSet::new();
-        if let Some(old_tree_id) = old_tree_id {
-            repo.find_tree(old_tree_id)?
-                .walk(TreeWalkMode::PostOrder, |_, entry| {
-                    old_ids.insert(entry.id());
-                    0
-                })?;
+        if let Err(e) = set_crate_metas(content) {
+            error!("failed to set crate metas {:?}", e);
         }
 
-        new_tree.walk(TreeWalkMode::PostOrder, |pwd, entry| {
-            if pwd.is_empty() || entry.kind() != Some(ObjectType::Blob) {
-                return 0;
-            }
-            if old_ids.contains(&entry.id()) {
-                trace!("skip {}/{}", pwd, entry.name().unwrap());
-                return 1;
-            }
-            let blob = match repo.find_blob(entry.id()) {
-                Ok(x) => x,
-                Err(e) => {
-                    error!(
-                        "failed to find blob: {}, pwd: {} entry: {:?} id: {}",
-                        e,
-                        pwd,
-                        entry.name(),
-                        entry.id()
-                    );
-                    return 0;
-                }
-            };
+        0
+    })?;
 
-            let content = blob
-                .content()
-                .split(|x| *x == b'\n')
-                .map(|line| serde_json::from_slice::<CrateMeta>(line))
-                .filter_map(|x| x.ok())
-                .collect::<Vec<_>>();
-            if content.is_empty() {
-                error!("no valid crate meta found in {}/{:?}", pwd, entry.name());
-                return 0;
-            }
-            if let Err(e) = self.set_crate_metas(content) {
-                error!("failed to set crate metas {:?}", e);
-            }
+    EXTRA_DB.insert(LAST_LOADED_TREE_ID, new_tree.id().as_bytes())?;
 
-            0
-        })?;
-
-        self.set_last_tree(new_tree.id())?;
-
-        Ok(())
-    }
+    Ok(())
 }
