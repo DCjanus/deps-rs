@@ -1,6 +1,7 @@
-use super::data::DepData;
 use actix_web::{http::header::ContentType, HttpResponse};
 use askama::Template;
+
+use super::data::DepData;
 
 #[derive(Template, Debug)]
 #[template(path = "server_error.html")]

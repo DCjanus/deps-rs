@@ -1,16 +1,16 @@
 use std::{collections::HashSet, path::Path, sync::RwLock};
 
 use git2::{FetchOptions, FetchPrune, ObjectType, Oid, ProxyOptions, Repository, TreeWalkMode};
+use once_cell::sync::Lazy;
 use rustsec::{Collection, Database};
 use semver::{Version, VersionReq};
 use sled::Tree;
 
 use crate::utils::AnyResult;
 
-lazy_static! {
-    static ref CRATE_DB: CrateDB = CrateDB::new(&crate::command::crate_db_path()).unwrap();
-    static ref AUDIT_DB: RwLock<Database> = RwLock::new(Database::fetch().unwrap());
-}
+static CRATE_DB: Lazy<CrateDB> =
+    Lazy::new(|| CrateDB::new(&crate::command::crate_db_path()).unwrap());
+static AUDIT_DB: Lazy<RwLock<Database>> = Lazy::new(|| RwLock::new(Database::fetch().unwrap()));
 
 pub fn init() -> AnyResult {
     fn tick() -> AnyResult {
@@ -33,9 +33,9 @@ pub fn init() -> AnyResult {
 
     debug!("fetching audit database");
     // TODO: fetching audit database via proxy
-    lazy_static::initialize(&AUDIT_DB);
+    Lazy::force(&AUDIT_DB);
     debug!("creating crate database");
-    lazy_static::initialize(&CRATE_DB);
+    Lazy::force(&CRATE_DB);
     tick()?;
 
     std::thread::spawn(|| loop {

@@ -1,11 +1,13 @@
-use super::html::{CrateSectionTemplate, DependenciesTableTemplate};
+use actix_web::{HttpResponse, Responder};
+use askama::Template;
+
 use crate::{
     analyze::AnalyzedCrate,
     model::{CrateIdentity, RepoIdentity, Status},
     view::html::{render_template, server_error_response},
 };
-use actix_web::{HttpResponse, Responder};
-use askama::Template;
+
+use super::html::{CrateSectionTemplate, DependenciesTableTemplate};
 
 #[get("/repo/{site}/{owner}/{repo}/status.svg")]
 pub async fn repo_svg(input: actix_web::web::Path<RepoIdentity>) -> impl Responder {

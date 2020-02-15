@@ -1,12 +1,12 @@
 use std::{path::PathBuf, time::Duration};
 
-use crate::utils::AnyResult;
+use once_cell::sync::Lazy;
 use structopt::StructOpt;
 use url::Url;
 
-lazy_static! {
-    static ref COMMAND: Command = Command::from_args();
-}
+use crate::utils::AnyResult;
+
+static COMMAND: Lazy<Command> = Lazy::new(Command::from_args);
 
 #[derive(Debug, StructOpt)]
 struct Command {
@@ -24,7 +24,7 @@ struct Command {
 }
 
 pub fn init() -> AnyResult {
-    lazy_static::initialize(&COMMAND);
+    Lazy::force(&COMMAND);
     Ok(())
 }
 

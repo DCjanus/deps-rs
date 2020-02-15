@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use bytes::Bytes;
+use once_cell::sync::Lazy;
 use reqwest::{Client, Proxy};
 
 use crate::{
@@ -8,20 +9,16 @@ use crate::{
     utils::AnyResult,
 };
 
-lazy_static! {
-    static ref GLOBAL_CLIENT: Client = {
-        match init_client() {
-            Ok(x) => x,
-            Err(e) => {
-                error!("init client failed: {:?}", e);
-                std::process::exit(1);
-            }
-        }
-    };
-}
+static GLOBAL_CLIENT: Lazy<Client> = Lazy::new(|| match init_client() {
+    Ok(x) => x,
+    Err(e) => {
+        error!("init client failed: {:?}", e);
+        std::process::exit(1);
+    }
+});
 
 pub fn init() -> AnyResult {
-    lazy_static::initialize(&GLOBAL_CLIENT);
+    Lazy::force(&GLOBAL_CLIENT);
     Ok(())
 }
 
