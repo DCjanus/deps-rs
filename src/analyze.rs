@@ -163,6 +163,7 @@ pub fn analyze_crate(crate_name: &str, version: Version) -> Option<AnalyzedCrate
     Some(result)
 }
 
+#[allow(clippy::type_complexity)]
 pub async fn analyze_repo(identity: &RepoIdentity) -> AnyResult<Vec<AnalyzedCrate>> {
     static CACHE: Lazy<Mutex<LruCache<RepoIdentity, (Instant, Vec<AnalyzedCrate>)>>> =
         Lazy::new(|| Mutex::new(LruCache::new(1024)));

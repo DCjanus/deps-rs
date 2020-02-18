@@ -27,6 +27,7 @@ pub fn init() -> AnyResult {
     Ok(())
 }
 
+#[allow(clippy::ptr_arg)]
 pub fn get(url: &String) -> AnyResult<Option<(String, IVec)>> {
     let mut cache = URL_TO_ETAG.lock().unwrap();
 
