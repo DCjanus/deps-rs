@@ -12,7 +12,7 @@ pub enum Site {
 }
 
 impl Site {
-    pub fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Site::GitHub => "github",
             Site::GitLab => "gitlab",
@@ -20,7 +20,7 @@ impl Site {
         }
     }
 
-    pub fn site_icon(&self) -> &'static str {
+    pub fn site_icon(self) -> &'static str {
         match self {
             Site::GitHub => "fa-github",
             Site::GitLab => "fa-gitlab",
@@ -28,7 +28,7 @@ impl Site {
         }
     }
 
-    pub fn base_uri(&self) -> &'static str {
+    pub fn base_uri(self) -> &'static str {
         match self {
             Site::GitHub => "https://github.com",
             Site::GitLab => "https://gitlab.com",

@@ -165,11 +165,13 @@ pub fn analyze_crate(crate_name: &str, version: Version) -> Option<AnalyzedCrate
 
 pub async fn analyze_repo(identity: &RepoIdentity) -> AnyResult<Vec<AnalyzedCrate>> {
     static CACHE: Lazy<Mutex<LruCache<RepoIdentity, (Instant, Vec<AnalyzedCrate>)>>> =
-        Lazy::new(|| Mutex::new(LruCache::new(1024 * 128)));
+        Lazy::new(|| Mutex::new(LruCache::new(1024)));
+
     {
         if let Some((created_at, cache)) = CACHE.lock().await.get(identity).cloned() {
             let created_at: Instant = created_at;
-            if created_at.elapsed() < Duration::from_secs(60 * 5) {
+            if created_at.elapsed() < Duration::from_secs(60) {
+                trace!("cache hint: {:?}", identity);
                 return Ok(cache);
             }
         }

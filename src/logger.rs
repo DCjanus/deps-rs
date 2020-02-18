@@ -17,11 +17,16 @@ pub fn init_logger() -> anyhow::Result<()> {
             ))
         })
         .level(LevelFilter::Info)
-        .level_for(
-            module_path!().splitn(2, "::").next().unwrap(),
-            LevelFilter::Debug,
-        )
+        .level_for(module_path!().splitn(2, "::").next().unwrap(), log_level())
         .chain(std::io::stdout())
         .apply()?;
     Ok(())
+}
+
+fn log_level() -> LevelFilter {
+    if cfg!(debug_assertions) {
+        LevelFilter::Trace
+    } else {
+        LevelFilter::Info
+    }
 }
